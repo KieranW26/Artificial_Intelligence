@@ -6,7 +6,6 @@ Created on Sun Dec 30 16:43:51 2018
 """
 from datetime import time
 from datetime import datetime
-import calendar 
 import re
 
 
@@ -46,21 +45,18 @@ class GACHATBOT:
             else: 
                 
                 if self.FLAG == 1: 
-                    print("Sup")
+                    print("")
                     if "yes" in userInput: 
                         self.findTrainTimes()
                     else:
                         self.clear()
-                        self.listen(userInput)
-                        self.respond(userInput)
+                        print("okay, lets try that again, what is your jounrey?")
                 else: 
                     self.listen(userInput)
                     self.respond(userInput)
             
-                
-           
-       
-            
+
+
     def listen(self, sentence): 
         words = sentence.split()
         if "return" in sentence.lower(): 
@@ -124,7 +120,7 @@ class GACHATBOT:
    
     
     def findTrainTimes(self):
-        #code for gathering train times here 
+        
         print("") 
     
     def clear(self):
