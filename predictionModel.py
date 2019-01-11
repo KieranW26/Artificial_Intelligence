@@ -17,13 +17,11 @@ class PredictionModel():
         
         return 1 / (1 + np.exp(-x))
 
-
     # calculates the derivative to the sigmoid function above for weight adjustments
     def sigmoidDerivative(self, x):
         
         return x * (1 - x)
     
-
     # trains the prediction model to understand and learn the outcomes of the train
     # routes based on the information given by the 2 arrays mentioned above   
     def weightAdjustment(self, routeInformation, routeLate, trainingIterations):
@@ -40,8 +38,7 @@ class PredictionModel():
             adjustments = np.dot(routeInformation.T, error * self.sigmoidDerivative(output))
 
             self.weights += adjustments
-            
-            
+                      
     # passes new data through the instances in the model to receive accurate
     # prediction based on the weights calculated earlier  
     def prediction(self, inputs):
@@ -64,50 +61,51 @@ class PredictionModel():
         mean = int(round(mean))
         
         return mean
-            
-if __name__ == "__main__":
     
-    trainPredictions = PredictionModel()
-    trainDeparture = str(input("What station are you departing from?: "))
-    trainDeparture = trainDeparture.lower()
-     
-    trainDestination = str(input("What station is your destination?: "))
-    trainDestination = trainDestination.lower()
-    
-    trainRoute = trainDeparture + " to " + trainDestination
-    
-    print("Your route is", trainRoute)
-    
-    dayOfTravel = str(input("What day are you travelling?: "))
-    dayOfTravel = dayOfTravel.lower()
-    if dayOfTravel == 'sunday' or 'saturday':
+    def trainData(self, trainDeparture):
         
-        day = 1
-        
-    else:
-      
-        day = 0
+         trainPredictions = PredictionModel()
+         trainDeparture = str(input("What station are you departing from?: "))
+         trainDeparture = trainDeparture.lower()
              
-    numberOfStops = int(input("How many stops are on your journey?: "))
-    if numberOfStops > 1:
+         trainDestination = str(input("What station is your destination?: "))
+         trainDestination = trainDestination.lower()
+            
+         trainRoute = trainDeparture + " to " + trainDestination
+            
+         print("Your route is", trainRoute)
+            
+         dayOfTravel = str(input("What day are you travelling?: "))
+         dayOfTravel = dayOfTravel.lower()
+         if dayOfTravel == 'sunday' or 'saturday':
+                
+             day = 1
+                
+        else:
+              
+            day = 0
+                     
+        numberOfStops = int(input("How many stops are on your journey?: "))
         
-        stops = 1
+        if numberOfStops > 1:
+                
+            stops = 1
+                
+        else:
+                
+            stops = 0
+            
+        timeOfDay = str(input("Are you travelling in the morning, afternoon or evening?: "))
+        timeOfDay = timeOfDay.lower()
+        if timeOfDay == 'morning' or 'evening':
+                
+            time = 1
+                
+        else:
+                
+            time = 0
         
-    else:
-        
-        stops = 0
-    
-    timeOfDay = str(input("Are you travelling in the morning, afternoon or evening?: "))
-    timeOfDay = timeOfDay.lower()
-    if timeOfDay == 'morning' or 'evening':
-        
-        time = 1
-        
-    else:
-        
-        time = 0
-    
-    if trainDeparture == 'acle':
+        if trainDeparture == 'acle':
         
         routeInformation = np.array([[0,0,0],[0,0,0],[0,0,0],[0,0,0],[0,0,0],
                                      [0,0,1],[0,0,1],[0,0,1],[0,0,1],[0,0,1],
@@ -290,8 +288,7 @@ if __name__ == "__main__":
         delayTimes = {6, 2, 9, 14, 10, 4, 8, 9, 4, 6, 1, 1, 7, 3, 2, 9, 5,
                       8, 14, 9, 10, 4, 6, 8, 3, 2, 6, 9, 13, 5, 2, 6, 4,
                       9, 5, 6, 4, 9, 2, 3, 9, 6, 4, 5, 1, 7, 4, 12, 6}
-
-    
+        
     trainPredictions.weightAdjustment(routeInformation, routeLate, 15000)
         
     prediction = trainPredictions.prediction(np.array([day, stops, time]))
@@ -300,6 +297,15 @@ if __name__ == "__main__":
     
     predictedDelay = trainPredictions.timeMean(delayTimes)
     print("Your predicted train delay is " , predictedDelay , " minutes, should one occur.")
+        
+    
+    
+   
+    
+    
+
+    
+    
     
     
     
