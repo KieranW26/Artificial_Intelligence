@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 30 16:43:51 2018
-
-@author: ging3
-"""
 from lxml import html
 from datetime import time, date
 from datetime import datetime
+from string import Template
 import re
 import csv
 import requests
+import nltk
+
+
+# nltk.download('nps_chat')
+# nltk.download('punkt')
 
 
 class KnowledgeBase:
@@ -135,267 +136,345 @@ class KnowledgeBase:
         return self.kb_changes
 
     def clear_kb(self):
-        kb_from_station_name = ""
-        kb_to_station_name = ""
-        kb_from_station_code = ""
-        kb_to_station_code = ""
-        kb_date = ""
-        kb_time = ""
-        kb_depart_or_arrive = ""
-        kb_ret_date = ""
-        kb_ret_time = ""
-        kb_ret_depart_or_arrive = ""
-        kb_command = ""
+        self.kb_from_station_name = ""
+        self.kb_to_station_name = ""
+        self.kb_from_station_code = ""
+        self.kb_to_station_code = ""
+        self.kb_date = ""
+        self.kb_time = ""
+        self.kb_depart_or_arrive = ""
+        self.kb_ret_date = ""
+        self.kb_ret_time = ""
+        self.kb_ret_depart_or_arrive = ""
+        self.kb_command = ""
 
 
 class GAChatBot:
+    # !! REGEX !!#
+    # Templates
+    bot_template = Template("BOT: $message")
 
-    def __init__(self):
-        # kb_from_station_code = ""
-        # kb_to_station_code = ""
+    date_error = False;
 
-        # GETS TODAY DATE AND TIME AND SEPERATES THEM
-        self.d = datetime.now().strftime("%d%m%y %H%M")
-        date, space, time = self.d.partition(' ')
-        kb.set_date(kb, date)
-        kb.set_time(kb, time)
-        # kb_date, space, kb_time = d.partition(' ')
-        self.dflag = 0
-        self.tflag = 0
+    data = csv.reader(open("norfolk_stations.csv"))
+    stations = []
+    for line in data:
+        stations.append(re.sub(r'[^a-zA-Z0-9 ]+', '', str(line).lower()))
+    date_regex = ('\d{2}/\d{2}/(?:\d{2}){1,2}')
+    time_regex = ('^(([01]\d|2[0-3]):([0-5]\d)|24:00)$')
+    month = ("(?:jan(?:uary)?)|(?:feb(?:ruary)?)|(?:mar(?:ch)?)|(?:apr(?:il)?)|(?:may?)"
+             + "|(?:jun(?:e)?)|(?:jul(?:ly)?)|(?:aug(?:ust)?)|(?:sep(?:tember)?)|(?:oct(?:ober)?)|(?:nov(?:ember)?)"
+             + "|(?:dec(?:ember)?)")
+    ret = False;
 
-        self.kb_return = False
+    def train_times(self):
+        from_station_name = kb.get_from_station(kb)
+        to_station_name = kb.get_to_station(kb)
+        date = kb.get_date(kb)
+        time = kb.get_time(kb)
+        depart_or_arrive = kb.get_depart_or_arrive(kb)
+        ret_date = kb.get_return_date(kb)
+        ret_time = kb.get_return_time(kb)
+        ret_depart_or_arrive = kb.get_return_depart_or_arrive(kb)
+        from_station = kb.get_from_station_code(kb)
+        to_station = kb.get_to_station_code(kb)
 
-        # ret_date, space2, ret_time = self.d.partition(' ')
-        # kb.set_return_date(kb, ret_date)
-        # kb.set_return_time(kb, ret_time)
-        # kb_ret_date, space2, kb_ret_time = d.partition(' ')
-        kb_command = ''
+        csv_file = csv.reader(open('norfolk_station_codes_with_names.csv', "rt"), delimiter=",")
 
-        self.cb_flag = 0
-        self.cb_running = True
+        for row in csv_file:
+            if (from_station_name.lower() in row[0].lower()) or (from_station_name in row[1].lower()):
+                from_station_name = row[0]
+                from_station = row[1]
+            elif (to_station_name.lower() in row[0].lower()) or (to_station_name.lower() in row[1].lower()):
+                to_station_name = row[0]
+                to_station = row[1]
 
-        # Key Words and Phrases
-        self.train_station = []
-        data = csv.reader(open("norfolk_stations.csv"))
-        for line in data:
-            # print(line)
-            self.train_station.append(re.sub(r'[^a-zA-Z0-9 ]+', '', str(line).lower()))
-
-        self.OPENING_PHRASES = ("Hello, I am TrainBot how could I help?")
-        self.MONTHS = (
-            "january", "february", "march", "april", "may", "june", "july", "august", "september", "october",
-            "november",
-            "decemeber")
-        self.TIME_CONTAIN = ("am", "pm")
-
-        # REGEX
-        self.date_regex = ('\d{2}/\d{2}/\d{4}')
-        self.time_regex = ('^(([01]\d|2[0-3]):([0-5]\d)|24:00)$')
-
-    def run_bot(self):
-        while self.cb_running is True:
-
-            print(kb.get_from_station(kb), kb.get_to_station(kb), kb.get_date(kb), kb.get_time(kb),
-                  kb.get_return_date(kb))
-            if kb.get_return_date(kb) != '':
-                print(kb.get_return_date(kb), kb.get_return_time(kb))
-            user_input = input("USER: ")
-            # print(self.DATE)
-            # self.DATE = self.DATE.replace(year = 2017, hour = 13)
-            # print(self.DATE)
-            if user_input == "stop":
-                self.cb_running = False
+        if (from_station != "") & (to_station != ""):
+            url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + from_station + "/" + to_station
+            if date == "":
+                date = "today"
+            url = url + "/" + date
+            if time == "":
+                time = str(datetime.now().time())
+                time = time[0:2] + time[3:5]
+            url = url + "/" + time
+            if depart_or_arrive == "":
+                depart_or_arrive = "dep"
+            url = url + "/" + depart_or_arrive
+            if ret_date != "":
+                url = url + "/" + ret_date
+                if ret_time == "":
+                    url = url + "/" + "0900/first"
+                else:
+                    url = url + "/" + ret_time
+                    if ret_depart_or_arrive == "":
+                        url = url + "/dep"
+                    else:
+                        url = url + "/" + ret_depart_or_arrive
+                page = requests.get(url)
+                tree = html.fromstring(page.content)
+                price = tree.xpath('//*[@id="singleFaresPane"]/strong/text()')
             else:
 
-                if self.cb_flag == 1:
-                    print("")
-                    if "yes" in user_input.lower():
-                        # WHERE THE PROGRAM CALLS THE FIND TRAIN TICKET FUNCTION
-                        # RENAME IF NEEDED - JACK
-                        pm.trainData(pm)
-                        self.findTrainTimes()
-                        kb.clear_kb(kb)
-                        self.cb_flag = 0
-                        self.dflag = 0
-                        self.tflag = 0
-                    else:
-                        kb.clear_kb(kb)
-                        self.cb_flag = 0
-                        self.dflag = 0
-                        self.tflag = 0
-                        print("okay, lets try that again, what is your journey?")
-                else:
-                    self.listen(user_input)
-                    self.respond(user_input)
+                page = requests.get(url)
+                tree = html.fromstring(page.content)
+                price = tree.xpath('//*[@id="fare-switcher"]/div/a/strong/text()')
 
-    def listen(self, sentence):
-        words = sentence.split()
-        if "return" in sentence.lower():
-            self.kb_return = True
+            price = re.sub(',.*$|[^£\d\.]', '', str(price))
+
+            f_time_dep = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[1]/text()')))
+            f_time_arr = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[4]/text()')))
+            f_price = re.sub('[^£\d\.]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[9]/div/label/text()')))
+            service = re.sub('[^A-Za-z ]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[8]/div/div/a/text()')))
+            ret_dep_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[1]/text()')))
+            ret_arr_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[4]/text()')))
+            ret_f_price = re.sub('[^£\d\.:]', '',
+                                 str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[9]/div[2]/label/text()')))
+            if ret_date == "":
+                output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                         + f_time_dep + " "
+                if date != 'today':
+                    output = output + " on " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+                else:
+                    output = output + date
+                output = output + ". Arriving in " + to_station_name + " at " + f_time_arr
+                output = output + " costing " + f_price
+
+                if price == f_price:
+                    output = output + ". This is the cheapest fare around those times." \
+                                      " This service is currently running: " + service
+                else:
+                    output = output + "\n" + "Cheapest price found from " + from_station_name + " to " + to_station_name \
+                             + " for " + price + ". This service is currently running: " + service
+
+            else:
+                ret_f_price = re.sub('[^\d]', '', ret_f_price)
+                f_price = re.sub('[^\d]', '', f_price)
+                total_price = float(f_price) + float(ret_f_price)
+                total_price = total_price / 100
+                total_price = str("£" + "%.2f" % total_price)
+                output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                         + f_time_dep + " and arrives at " + to_station_name + " at " + f_time_arr
+                if date != 'today':
+                    output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+                else:
+                    output = output + " on " + date
+                output = output + ".\nYour return journey will leave " + to_station_name + " at " + ret_dep_time \
+                         + " and arrives at " + from_station_name + " at " + ret_arr_time
+                if ret_date != 'today':
+                    output = output + " on " + ret_date[:2] + "/" + ret_date[2:4] + "/" + ret_date[4:8]
+                else:
+                    output = output + ret_date
+                output = output + ".\nThis journey will cost " + total_price
+                if total_price != price:
+                    output = output + "\nCheaper return journey from " + from_station_name + " to " + to_station_name \
+                             + " for " + price + " is available."
+
+            print(output)
+            print(url)
+
+    def setUp(self):
+        posts = nltk.corpus.nps_chat.xml_posts()[:10000]
+        featuresets = [(self.meaning(post.text), post.get('class'))
+                       for post in posts]
+        size = int(len(featuresets) * 0.1)
+        train_set = featuresets[size:]
+        classifier = nltk.NaiveBayesClassifier.train(train_set)
+        return classifier
+
+    def meaning(self, post):
+        features = {}
+        for word in nltk.word_tokenize(post):
+            features['contains({})'.format(word.lower())] = True
+        return features
+
+    def run(self, classifier):
+        running = True
+        print(self.bot_template.substitute(message="Hello There, how can i help you today?"))
+        while running:
+            user_input = input("USER: ")
+            if user_input == "stop":
+                running = False
+            self.listen(classifier, user_input)
+
+    def listen(self, classifier, user_input):
+        intent = classifier.classify(self.meaning(user_input))
+        if intent == "ynQuestion":
+            self.ynQuestion(user_input)
+        elif intent == "whQuestion":
+            self.whQuestion(user_input)
+        elif intent == "Greet":
+            print((self.bot_template.substitute(message="Hiya!")))
+        else:
+            self.trains(user_input)
+
+    def ynQuestion(self, user_input):
+        print("no answer for the question sorry")
+
+    def whQuestion(self, user_input):
+        if re.search("delay", user_input.lower()):
+            stations = []
+            for word in user_input.split():
+                if word.lower in self.stations:
+                    stations.append(word)
+            if not stations:
+                print("To determine if there was a delay, I will need the two stations")
+            elif len(stations) == 1:
+                print("We got one of your stations, but will need the other one to continue")
+            else:
+                print("we got em")
+
+    def trains(self, user_input):
+        words = user_input.split()
+        sta = []
+        dates = []
+        times = []
+        count = 0
+        times = re.findall(self.month, user_input)
         for counter, word in enumerate(words):
+            if word.lower() in self.stations:
+                sta.append(word)
+            elif re.search(self.date_regex, word):
+                dates.append(word)
+            elif re.match(self.month, word):
+                dates.append(self.convertDate(user_input, word, count))
+                count + + 1
+            elif re.search(self.time_regex, word):
+                times.append(word)
+            elif word.lower() == "return":
+                self.ret = True
 
-            if word.lower() in self.train_station:
-                if words[counter - 1] is "to" or kb.get_from_station(kb) is not "empty":
-                    kb.set_to_station(kb, word.lower())
-                else:
-                    kb.set_from_station(kb, word.lower())
-                    print(kb.get_from_station(kb))
-                    # date capture - only 1 method implemented with format "dd/mm/yy"
-            elif re.search(self.date_regex, word) and self.dflag == 0:
-                self.dflag = 1
-                self.kb_date = word
-            elif re.search(self.time_regex, word) and self.tflag == 0:
-                self.tflag = 1
-                self.kb_time = word
-            elif self.kb_return is True:
-                if re.search(self.date_regex, word):
-                    self.kb_ret_date = word
-                elif re.search(self.time_regex, word):
-                    self.kb_ret_time = word
+        if dates:
+            self.analyseDates(words, dates)
+        if times:
+            self.analyseTimes(words, times)
+        if sta:
+            self.analyseStations(words, sta)
+        self.TrainResponse()
 
-    def respond(self, setence):
-        start = "BOT: "
-        answer = "You still need to enter your"
-        if kb.get_from_station(kb) == "empty":
+    def convertDate(self, date, word, count):
+        day = re.findall('\d+(?=st|nd|rd|th)', date)
+        if len(day[count]) == 1:
+            day[count] = "0" + day[count]
+        month = str(self.monthToNumber(word))
+        if len(month) == 1:
+            month = "0" + month
+        year = re.findall('(?<=\s)[0-9]{4}', date)
+        if year and len(year[count]) == 4:
+            year[count] = year[count][-2:]
+        newDate = day[count] + "/" + month + "/"
+        if year:
+            return (newDate + year[count])
+        else:
+            return (newDate + "19")
+
+    # analysing stations
+    def analyseStations(self, words, stations):
+        if len(stations) == 1:
+            kb.set_from_station(kb, stations[0])
+        else:
+            start = stations[1]
+            finish = stations[0]
+            temp = ""
+            x = words.index(start)
+            y = words.index(finish)
+            if words[x - 1].lower() == "to" or words[y - 1].lower() == "from":
+                temp = start
+                start = finish
+                finish = temp
+            kb.set_from_station(kb, start.lower())
+            kb.set_to_station(kb, finish.lower())
+            print(kb.kb_from_station_name)
+            print(kb.kb_to_station_name)
+            # self.findTrainTimes()
+
+    # analysing dates
+    def analyseDates(self, words, dates):
+        date1 = datetime.strptime(dates[0], '%d/%m/%y')
+        # compare date needs to be made at begining of the run of the program
+        if self.compareDates(datetime.now(), date1):
+            self.date_error = True
+        elif len(dates) > 1:
+            date2 = datetime.strptime(dates[1], '%d/%m/%y')
+            if self.compareDates(date1, date2):
+                print(str(date1) + " is earlier than " + str(date2))
+                kb.set_date(kb, dates[1])
+                kb.set_return_date(kb, dates[0])
+            else:
+                print(str(date1) + " is later than " + str(date2))
+                kb.set_date(kb, dates[0].lower())
+                kb.set_date(kb, dates[1].lower())
+                print(kb.kb_ret_date)
+        else:
+            kb.set_date(kb, dates[0].lower())
+
+    def analyseTimes(self, words, times):
+        if len(times) == 1:
+            if self.ret:
+                kb.set_time(kb, times[0])
+        else:
+            kb.set_time(kb, times[1])
+            kb.set_time(kb, times[0])
+
+    def compareDates(self, date1, date2):
+        return date1 > date2
+
+    def TrainResponse(self):
+        answer = ""
+        
+        if kb.kb_from_station_name == "":
             answer = answer + " starting station "
-        if kb.get_to_station(kb) == "empty":
+        if kb.kb_to_station_name == "":
             if answer == "You still need to enter your":
                 answer = answer + " destination station "
             else:
                 answer = answer + "and destination station"
 
         # checks if they still need minimum information
-        if answer != "You still need to enter your":
-            print(start + answer)
+        if answer != "":
+            print("BOT:" + answer)
         else:
-            response = "You are traveling from " + kb.get_from_station(kb) + " to " + kb.get_to_station(kb) + " on "
-            response = response + kb.get_date(kb) + " at " + kb.get_time(kb)
-
-            if kb.get_return_date(kb) != '':
+            response = "You would like to go from " + kb.kb_from_station_name + " to " + kb.kb_to_station_name
+            if kb.kb_date == "":
+                response = response + " today"
+            else:
+                response = response + " on " + kb.kb_date
+            print("BOT: " + response)
+            if self.ret:
                 response = response + " and returning on the "
-                if kb.get_return_date(kb) == kb.get_date(kb):
-                    response = response + "same day at " + kb.get_return_time(kb)
+                if kb.kb_ret_date == kb.kb_date or kb.kb_ret_date == "":
+                    response = response + " same day at " + kb.kb_ret_time
                 else:
-                    response = response + kb.get_return_date(kb) + " at " + kb.get_return_time(kb)
-            print(response + ". Is that Correct?")
-            self.cb_flag += 1
+                    response = response + kb.kb_ret_date + " at " + kb.kb_ret_time
+            # TODO: IF yes
+            self.train_times()
+            kb.clear_kb(kb)
 
-    def findTrainTimes(self):
-        expecting_date = False
-        csv_file = csv.reader(open('norfolk_station_codes_with_names.csv', "rt"), delimiter=",")
-        from_station = ''
-        to_station = ''
-        from_station_name = kb.get_from_station(kb)
-        to_station_name = kb.get_to_station(kb)
-        if (from_station_name is not '') and (to_station_name is not ''):
-            for row in csv_file:
-                if (from_station_name in row[0].lower()) or (from_station_name in row[1].lower()):
-                    from_station_name = row[0]
-                    from_station = row[1]
-                elif (to_station_name in row[0].lower()) or (to_station_name in row[1].lower()):
-                    to_station_name = row[0]
-                    to_station = row[1]
-            while expecting_date & (kb.get_date(kb) == ''):
-                print("Please enter a date, entering no date will set date to today")
-                expecting_date = False
+    def monthToNumber(self, string):
+        m = {
+            'jan': 1,
+            'feb': 2,
+            'mar': 3,
+            'apr': 4,
+            'may': 5,
+            'jun': 6,
+            'jul': 7,
+            'aug': 8,
+            'sep': 9,
+            'oct': 10,
+            'nov': 11,
+            'dec': 12
+        }
+        s = string.strip()[:3].lower()
 
-            if (from_station != "") & (to_station != ""):
-                url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + from_station + "/" + to_station
-                if kb.get_date(kb) == "":
-                    kb.set_date(kb, 'today')
-                url = url + "/" + kb.get_date(kb)
-                if to_station == "":
-                    kb_time = str(datetime.datetime.now().kb_time())
-                    kb_time = kb_time[0:2] + kb_time[3:5]
-                url = url + "/" + kb.get_time(kb)
-                if kb.get_depart_or_arrive(kb) == "":
-                    kb_depart_or_arrive = "dep"
-                url = url + "/" + kb_depart_or_arrive
-                if kb.get_return_date(kb) != "":
-                    url = url + "/" + kb.get_return_date(kb)
-                    if kb.get_return_time(kb) == "":
-                        url = url + "/" + "0900/first"
-                    else:
-                        url = url + "/" + kb.get_return_time(kb)
-                        if kb.get_return_depart_or_arrive(kb) == "":
-                            url = url + "/dep"
-                        else:
-                            url = url + "/" + kb.get_return_depart_or_arrive(kb)
-                    page = requests.get(url)
-                    tree = html.fromstring(page.content)
-                    price = tree.xpath('//*[@id="singleFaresPane"]/strong/text()')
-                else:
+        try:
+            out = m[s]
+            return out
+        except:
+            raise ValueError('Not a month')
 
-                    page = requests.get(url)
-                    tree = html.fromstring(page.content)
-                    price = tree.xpath('//*[@id="fare-switcher"]/div/a/strong/text()')
-
-                price = re.sub(',.*$|[^£\d\.]', '', str(price))
-                num_changes = re.sub('[^\d]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[6]/text()')))
-                kb.set_changes(num_changes)
-                f_time_dep = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[1]/text()')))
-                f_time_arr = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[4]/text()')))
-                f_price = re.sub('[^£\d\.]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[9]/div/label/text()')))
-                service = re.sub('[^A-Za-z ]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[8]/div/div/a/text()')))
-                ret_dep_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[1]/text()')))
-                ret_arr_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[4]/text()')))
-                ret_f_price = re.sub('[^£\d\.:]', '',
-                                     str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[9]/div[2]/label/text()')))
-                ret_date = kb.get_return_date(kb)
-                date = kb.get_date(kb)
-
-                if ret_date == "":
-                    output = "The train closest to your chosen time leaves " + kb.get_from_station(kb) + " at " \
-                             + f_time_dep + " on "
-                    if date != 'today':
-                        output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
-                    else:
-                        output = output + " on " + date
-                    output = output + " costing " + f_price
-
-                    if price == f_price:
-                        output = output + ". This is the cheapest fare around those times." \
-                                          " This service is currently running: " + service
-                    else:
-                        output = output + "\n" + "Cheapest price found from " + from_station_name + " to " + to_station_name \
-                                 + " for " + price + ". This service is currently running: " + service
-
-                else:
-                    print(url)
-                    ret_f_price = re.sub('[^\d]', '', ret_f_price)
-                    f_price = re.sub('[^\d]', '', f_price)
-                    total_price = float(f_price) + float(ret_f_price)
-                    total_price = total_price / 100
-                    total_price = str("£" + "%.2f" % total_price)
-                    output = "The train closest to your chosen time leaves " + from_station_name + " at " \
-                             + f_time_dep + " and arrives at " + to_station_name + " at " + f_time_arr
-                    if date != 'today':
-                        output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
-                    else:
-                        output = output + " on " + date
-                    output = output + ".\nYour return journey will leave " + to_station_name + " at " + ret_dep_time \
-                             + " and arrives at " + from_station_name + " at " + ret_arr_time
-                    if ret_date != 'today':
-                        output = output + " on " + ret_date[:2] + "/" + ret_date[2:4] + "/" + ret_date[4:8]
-                    else:
-                        output = output + ret_date
-                    output = output + ".\nThis journey will cost " + total_price
-                    if total_price != price:
-                        output = output + "\nCheaper return journey from " + from_station_name + " to " + to_station_name \
-                                 + " for " + price + " is available."
-
-                        # TODO: ADD 'NEXT TRAIN'
-                        # TODO: ADD 'FIRST/LAST TRAIN'
-                        # TODO: COMMENTS
-                print(output)
-                print(url)
-
-            print("")
-        if to_station_name == '':
-            print('To Station Error')
-
-        if from_station_name == '':
-            print('from station name error')
+    def compareTime(self, time1, time2):
+        return time1 > time2
 
 
 import numpy as np
@@ -409,7 +488,7 @@ class PredictionModel:
         np.random.seed(1)
 
         # converting the weights, based on a 3 integer array representing information
-        # about the train route, and a 1 integer array based on whether the train is 
+        # about the train route, and a 1 integer array based on whether the train is
         # late or not
         self.weights = 2 * np.random.random((3, 1)) - 1
 
@@ -425,7 +504,7 @@ class PredictionModel:
         return x * (1 - x)
 
     # trains the prediction model to understand and learn the outcomes of the train
-    # routes based on the information given by the 2 arrays mentioned above   
+    # routes based on the information given by the 2 arrays mentioned above
     def weightAdjustment(self, routeInformation, routeLate, trainingIterations):
 
         for iteration in range(trainingIterations):
@@ -441,7 +520,7 @@ class PredictionModel:
             self.weights += adjustments
 
     # passes new data through the instances in the model to receive accurate
-    # prediction based on the weights calculated earlier  
+    # prediction based on the weights calculated earlier
     def prediction(self, inputs):
 
         inputs = inputs.astype(float)
@@ -701,5 +780,5 @@ if __name__ == "__main__":
     kb = KnowledgeBase
     pm = PredictionModel
     test_bot = GAChatBot()
-    test_bot.__init__()
-    test_bot.run_bot()
+    classifier = test_bot.setUp()
+    test_bot.run(classifier)
