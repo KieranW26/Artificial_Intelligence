@@ -135,17 +135,17 @@ class KnowledgeBase:
         return self.kb_changes
 
     def clear_kb(self):
-        kb_from_station_name = ""
-        kb_to_station_name = ""
-        kb_from_station_code = ""
-        kb_to_station_code = ""
-        kb_date = ""
-        kb_time = ""
-        kb_depart_or_arrive = ""
-        kb_ret_date = ""
-        kb_ret_time = ""
-        kb_ret_depart_or_arrive = ""
-        kb_command = ""
+        self.kb_from_station_name = ""
+        self.kb_to_station_name = ""
+        self.kb_from_station_code = ""
+        self.kb_to_station_code = ""
+        self.kb_date = ""
+        self.kb_time = ""
+        self.kb_depart_or_arrive = ""
+        self.kb_ret_date = ""
+        self.kb_ret_time = ""
+        self.kb_ret_depart_or_arrive = ""
+        self.kb_command = ""
 
 
 class GAChatBot:
@@ -184,7 +184,11 @@ class GAChatBot:
             user_input = input("USER: ")
             if user_input == "stop":
                 running = False
-            self.listen(classifier, user_input)
+            elif user_input == "clear":
+                kb.clear_kb(kb) 
+                print("BOT: Data Clear" )
+            else:
+                self.listen(classifier, user_input)
             
 
     def listen(self, classifier, user_input): 
@@ -227,8 +231,10 @@ class GAChatBot:
                    sta.append(word)
                elif re.search(self.date_regex, word):
                    dates.append(word)
+                   print(word)
                elif re.match(self.month, word):
-                   dates.append(self.convertDate(user_input, word, count))
+                   print(word)
+                   #dates.append(self.convertDate(user_input, word, count))
                    count ++ 1
                elif re.search(self.time_regex, word):
                    times.append(word)
@@ -241,9 +247,12 @@ class GAChatBot:
             self.analyseTimes(words, times)
         if sta:
             self.analyseStations(words, sta)
-        self.TrainResponse()
-        
+        if sta or times or dates: 
+            self.trainResponse()
+        else: 
+            print("BOT: Not sure what you meant by that, do you want to book a train perhaps?")
     
+  
     def convertDate(self, date, word, count):
         day = re.findall('\d+(?=st|nd|rd|th)', date)
         if len(day[count]) == 1:
@@ -265,7 +274,18 @@ class GAChatBot:
     #analysing stations
     def analyseStations(self, words, stations):
         if len(stations) == 1: 
-            kb.set_from_station(kb, stations[0])
+            if len(words) != 1:
+                print(stations[0])
+                x = words.index(stations[0])
+                if words[x-1].lower() == "to":
+                    kb.set_to_station(kb, stations[0])
+                    print(stations[0])
+                else:
+                    kb.set_from_station(kb, stations[0])
+                    print(stations[0])
+            else:
+                kb.set_from_station(kb, stations[0])
+                print(stations[0])
         else: 
             start = stations[1]
             finish = stations[0]
@@ -312,36 +332,63 @@ class GAChatBot:
             
     def compareDates(self, date1, date2): 
         return date1 > date2
-    def TrainResponse(self):
-        answer = ""
-        
-        if kb.kb_from_station_name == "":
-            answer = answer + " starting station " 
+    
+    def trainResponse(self):
+        answer = "We need your "   
         if kb.kb_to_station_name == "":
-            if answer == "You still need to enter your":
-                answer = answer + " destination station "
-            else: 
-                answer = answer + "and destination station"
+            print("BOT: You told me your start station," + str(kb.kb_from_station_name) + ", so where are you going?")
+            flag = 0
+            while kb.kb_to_station_name == "" and flag != 1: 
+                user_input = input("USER: ")
+                intent = self.listenForStation(user_input)
+                if intent == "Accept" or intent == "yAnswer": 
+                    print("Okay, please can you type in your destination")
+                elif intent == "Reject" or intent == "nAnswer": 
+                    print("Ah okay, my mistake, how could I help you?")
+                    flag = 1
+        elif kb.kb_from_station_name == "": 
+            print("BOT: You only told your destination, so where do you want to start your journey")
+            flag = 0
+            while kb.kb_from_station_name == "" and flag != 1: 
+                user_input = input("USER: ")
+                intent = self.listenForStation(user_input)
+                if intent == "Accept" or intent == "yAnswer": 
+                    print("Okay, please can you type in your destination")
+                elif intent == "Reject" or intent == "nAnswer": 
+                    print("Ah okay, my mistake, how could I help you?")
+                    flag = 1
+        print("BOT: All good, I got your data you are going from " + str(kb.kb_from_station_name) + " to " + kb.kb_to_station_name)
         
-        #checks if they still need minimum information 
-        if answer != "":
-            print("BOT:"  + answer )
-        else: 
-            response = "You would like to go from " + kb.kb_from_station_name + " to " + kb.kb_to_station_name
-            if kb.kb_date == "": 
-                response = response + " today"
-            else: 
-                response = response + " on " + kb.kb_date
-            print("BOT: " + response)
-            if self.ret:
-                response = response + " and returning on the " 
-                if kb.kb_ret_date == kb.kb_date or ke.kb_ret_date == "":
-                    response = response + " same day at " + kb.kb_ret_time
-                else: 
-                    response = response + kb_ret_date + " at " + kb._ret_time 
         
-            
-  
+    def listenForStation(self, user_input):
+      words = user_input.split()  
+      stations = []
+      for word in words: 
+          if word.lower() in self.stations:
+              stations.append(word)
+      print(stations)
+      if stations: 
+          if len(stations) > 1: 
+              #print("Whoops")
+              print("BOT: Too Many Stations")
+              return "return"
+          elif kb.kb_from_station_name == "":
+              #print("fROM STATION")
+              station = stations[0]
+              kb.set_from_station(kb, station)
+          else:
+              #print("to station")
+              kb.set_to_station(kb, stations[0])
+          return           
+      else: 
+          print("BOT: Wait, do you not wish to book a train?")
+          user_input = input("USER:")
+          return self.determineIntent(user_input)
+      
+    def determineIntent(self, user_input):       
+        intent = classifier.classify(self.meaning(user_input)) 
+        return intent
+          
     def monthToNumber(self, string):
         m = {
             'jan': 1,
