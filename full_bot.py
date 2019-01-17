@@ -1,196 +1,1057 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Dec 30 16:43:51 2018
 
-@author: ging3
-"""
 import csv
-from datetime import time
-from datetime import datetime
-import calendar
 import re
-import re
-from typing import Tuple
-from urllib.request import urlopen
-from lxml import html
+from datetime import date
+from datetime import datetime, timedelta
+from string import Template
+
+import nltk
 import requests
-from pyknow import *
+from lxml import html
+from nltk.stem import PorterStemmer
 
 
+class KnowledgeBase:
+    kb_from_station_name = ""
+    kb_to_station_name = ""
+    kb_from_station_code = ""
+    kb_to_station_code = ""
+    kb_date = ""
+    kb_time = ""
+    kb_depart_or_arrive = ""
+    kb_ret_date = ""
+    kb_ret_time = ""
+    kb_ret_depart_or_arrive = ""
+    kb_command = ""
+    kb_changes = ""
 
-class GACHATBOT:
-    # Variables for Journey
-    START_STATION = "empty"
-    DESTINATION_STATION = "empty"
-    DATE = datetime.today()
-    # Variables for return journeys
-    RETURN = False
-    RETURN_DATE = datetime.today()
-    # Variables for running of the system
-    RUNNING = True
-    CHECK_DATE = datetime.today()
-    FLAG = 0
+    def set_changes(self, changes):
+        self.kb_changes = changes
+
+    def set_from_station_code(self, from_station_code):
+        self.kb_from_station_code = from_station_code
+
+    def set_to_station_code(self, to_station_code):
+        self.kb_to_station_code = to_station_code
+
+    def set_command(self, command):
+        self.kb_command = command
+
+    def set_from_station(self, from_station):
+        self.kb_from_station_name = from_station
+
+    def set_to_station(self, to_station):
+        self.kb_to_station_name = to_station
+
+    def set_date(self, date):
+        self.kb_date = date
+
+    def set_time(self, time):
+        self.kb_time = time
+
+    def set_depart_or_arrive(self, depart_or_arrive):
+        self.kb_depart_or_arrive = depart_or_arrive
+
+    def set_return_date(self, ret_date):
+        self.kb_ret_date = ret_date
+
+    def set_return_time(self, ret_time):
+        self.kb_ret_time = ret_time
+
+    def set_return_depart_or_arrive(self, ret_depart_or_arrive):
+        self.kb_ret_depart_or_arrive = ret_depart_or_arrive
+
+    def remove_changes(self):
+        self.kb_changes = ""
+
+    def remove_command(self):
+        self.kb_command = ""
+
+    def remove_from_station(self):
+        self.kb_from_station_name = ""
+
+    def remove_to_station(self):
+        self.kb_to_station_name = ""
+
+    def remove_date(self):
+        self.kb_date = ""
+
+    def remove_time(self):
+        self.kb_time = ""
+
+    def remove_depart_or_arrive(self):
+        self.kb_depart_or_arrive = ""
+
+    def remove_return_date(self):
+        self.kb_ret_date = ""
+
+    def remove_return_time(self):
+        self.kb_ret_time = ""
+
+    def remove_return_depart_or_arrive(self):
+        self.kb_ret_depart_or_arrive = ""
+
+    def remove_from_station_code(self):
+        self.kb_from_station_code = ""
+
+    def remove_to_station_code(self):
+        self.kb_to_station_code = ""
+
+    def get_command(self):
+        return self.kb_command
+
+    def get_from_station(self):
+        return self.kb_from_station_name
+
+    def get_to_station(self):
+        return self.kb_to_station_name
+
+    def get_date(self):
+        return self.kb_date
+
+    def get_time(self):
+        return self.kb_time
+
+    def get_depart_or_arrive(self):
+        return self.kb_depart_or_arrive
+
+    def get_return_date(self):
+        return self.kb_ret_date
+
+    def get_return_time(self):
+        return self.kb_ret_time
+
+    def get_return_depart_or_arrive(self):
+        return self.kb_ret_depart_or_arrive
+
+    def get_from_station_code(self):
+        return self.kb_from_station_code
+
+    def get_to_station_code(self):
+        return self.kb_to_station_code
+
+    def get_changes(self):
+        return self.kb_changes
+
+    def clear_kb(self):
+        self.kb_from_station_name = ""
+        self.kb_to_station_name = ""
+        self.kb_from_station_code = ""
+        self.kb_to_station_code = ""
+        self.kb_date = ""
+        self.kb_time = ""
+        self.kb_depart_or_arrive = ""
+        self.kb_ret_date = ""
+        self.kb_ret_time = ""
+        self.kb_ret_depart_or_arrive = ""
+        self.kb_command = ""
+
+# Method for scrapping the train data and returning it to the user.
+def train_times():
+    # Pulling information from the KnowledgeBase
+    from_station_name = kb.get_from_station(kb)
+    to_station_name = kb.get_to_station(kb)
+    date = kb.get_date(kb)
+    time = kb.get_time(kb)
+    time = re.sub('[^\d]', '', time)
+    depart_or_arrive = kb.get_depart_or_arrive(kb)
+    ret_date = kb.get_return_date(kb)
+    ret_date = re.sub('[^\d]', '', ret_date)
+    ret_time = kb.get_return_time(kb)
+    ret_depart_or_arrive = kb.get_return_depart_or_arrive(kb)
+    from_station = kb.get_from_station_code(kb)
+    to_station = kb.get_to_station_code(kb)
 
 
+    # Checks through .csv file and gets the station codes for each name
+    csv_file = csv.reader(open('norfolk_station_codes_with_names.csv', "rt"), delimiter=",")
 
-    # Key Words and Phrases
+    for row in csv_file:
+        if (from_station_name.lower() in row[0].lower()) or (from_station_name in row[1].lower()):
+            from_station_name = row[0]
+            from_station = row[1]
+        elif (to_station_name.lower() in row[0].lower()) or (to_station_name.lower() in row[1].lower()):
+            to_station_name = row[0]
+            to_station = row[1]
 
+    # Starts builds URL for data scraping
+    if (from_station != "") & (to_station != ""):
+        url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + from_station + "/" + to_station
+        if date == "":
+            date = "today"
+        else:
+            date = re.sub('[^\d]', '', date)
+        url = url + "/" + date
+        if time == "":
+            time = str(datetime.now().time())
+            time = time[0:2] + time[3:5]
+        url = url + "/" + time
+        if depart_or_arrive == "":
+            depart_or_arrive = "dep"
+        url = url + "/" + depart_or_arrive
+        if ret_date != "":
+            url = url + "/" + ret_date
+            if ret_time == "":
+                url = url + "/" + "2200"
+            else:
+                url = url + "/" + ret_time
+            if ret_depart_or_arrive == "":
+                url = url + "/dep"
+            else:
+                url = url + "/" + ret_depart_or_arrive
+            page = requests.get(url)
+            tree = html.fromstring(page.content)
+            price = tree.xpath('//*[@id="singleFaresPane"]/strong/text()')
+        else:
+            page = requests.get(url)
+            tree = html.fromstring(page.content)
+            price = tree.xpath('//*[@id="fare-switcher"]/div/a/strong/text()')
+        #After string is full formed, goes to url and scraping is below.
+        price = re.sub(',.*$|[^£\d\.]', '', str(price))
+
+        f_time_dep = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[1]/text()')))
+        f_time_arr = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[4]/text()')))
+        f_price = re.sub('[^£\d\.]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[9]/div/label/text()')))
+        ret_dep_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[1]/text()')))
+        ret_arr_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[4]/text()')))
+        ret_f_price = re.sub('[^£\d\.:]', '',
+                             str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[9]/div[2]/label/text()')))
+
+        # Collates and returns the information retrieved based upon the information required
+        if ret_date == "":
+            output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                     + f_time_dep + " "
+            if date != 'today':
+                output = output + " on " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+            else:
+                output = output + date
+            output = output + ". Arriving in " + to_station_name + " at " + f_time_arr
+            output = output + " costing " + f_price
+
+            if price == f_price:
+                output = output + ". This is the cheapest fare around those times." \
+
+            else:
+                output = output + "\n" + "Cheapest price found from " + from_station_name + " to " + to_station_name \
+                         + " for " + price
+
+        else:
+            ret_f_price = re.sub('[^\d]', '', ret_f_price)
+            f_price = re.sub('[^\d]', '', f_price)
+            print(url)
+            total_price = float(f_price) + float(ret_f_price)
+            total_price = total_price / 100
+            total_price = str("£" + "%.2f" % total_price)
+            output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                     + f_time_dep + " and arrives at " + to_station_name + " at " + f_time_arr
+            if date != 'today':
+                output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+            else:
+                output = output + " on " + date
+            output = output + ".\nYour return journey will leave " + to_station_name + " at " + ret_dep_time \
+                     + " and arrives at " + from_station_name + " at " + ret_arr_time
+            if ret_date != 'today':
+                output = output + " on " + ret_date[:2] + "/" + ret_date[2:4] + "/" + ret_date[4:8]
+            else:
+                output = output + ret_date
+            output = output + ".\nThis journey will cost " + total_price
+            if total_price != price:
+                output = output + "\nCheaper return journey from " + from_station_name + " to " + to_station_name \
+                         + " for " + price + " is available."
+
+        #Prints prices found and a link to them.
+        print(output)
+        print(url)
+
+
+class GAChatBot:
+    # !! REGEX !!#
+    # Templates
+    stemmer = PorterStemmer()
+    bot_template = Template("BOT: $message")
+
+    response_template = Template("BOT: So you are planning to journey from $station1 to $station2")
+    date_error = False;
 
     data = csv.reader(open("norfolk_stations.csv"))
-    TRAIN_STATIONS = []
+    stations = []
     for line in data:
-        TRAIN_STATIONS.append(re.sub(r'[^a-zA-Z0-9 ]+', '', str(line).lower()))
+        stations.append(re.sub(r'[^a-zA-Z0-9 ]+', '', str(line).lower()))
 
-    OPENING_PHRASES = ("Hello, I am TrainBot how could I help?")
-    MONTHS = (
-    "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november",
-    "decemeber")
-    TIME_CONTAIN = ("am", "pm")
+    date_regex = ('\d{2}/\d{2}/(?:\d{2}){1,2}')
+    time_regex = ('^(([01]\d|2[0-3]):([0-5]\d)|24:00)$')
+    month = ("(?:jan(?:uary)?)|(?:feb(?:ruary)?)|(?:mar(?:ch)?)|(?:apr(?:il)?)|(?:may?)"
+             + "|(?:jun(?:e)?)|(?:jul(?:ly)?)|(?:aug(?:ust)?)|(?:sep(?:tember)?)|(?:oct(?:ober)?)|(?:nov(?:ember)?)"
+             + "|(?:dec(?:ember)?)")
 
-    # REGEX
-    DATE_REGEX = ('\d{2}/\d{2}/\d{4}')
-    TIME_REGEX = ('^(([01]\d|2[0-3]):([0-5]\d)|24:00)$')
+    longMonth = [1, 3, 5, 7, 8, 10, 12]
+    shortMonth = [4, 6, 9, 11]
+    dayTerms = ["today", "tomorrow", "week", "fortnight", "fortnight"]
+    dayTerms2 = ["first", "second", "third", "fourth", "fifth"
+                                                       "sixth", "seventh", "eighth", "ninth", "tenth"
+                                                                                              "eleventh", "twelveth",
+                 "thirteenth", "fourteenth"
+                               "fifteenth", "sixteenth", "eighteenth", "nineteenth"
+                                                                       "twentieth", "twenty-first", "twenty-second",
+                 "twenty-fourth"
+                 "twenty-fifth", "twenty-sixth", "twenty-seventh", "twenty-eighth"
+                                                                   "twenty-ninth", "thirtieth", "thirty-first"]
 
-    def runBot(self):
-        while self.RUNNING is True:
-            userInput = input("USER: ")
-            # print(self.DATE)
-            # self.DATE = self.DATE.replace(year = 2017, hour = 13)
-            # print(self.DATE)
-            if userInput == "stop":
-                self.RUNNING = False
+    delayTerms = ["delay", "late", "interupt"]
+    everything = ["everything", "all", "none"]
+
+    ret = False
+    confirmed = False
+    delay = False
+    invalidDate = False
+
+    def setup(self):
+
+        posts = nltk.corpus.nps_chat.xml_posts()[:10000]
+        feature_sets = [(self.meaning(post.text), post.get('class'))
+                       for post in posts]
+        size = int(len(feature_sets) * 0.1)
+        train_set = feature_sets[size:]
+        classifier = nltk.NaiveBayesClassifier.train(train_set)
+        return classifier
+
+    def meaning(self, post):
+        features = {}
+        for word in nltk.word_tokenize(post):
+            features['contains({})'.format(word.lower())] = True
+        return features
+
+    def run(self, classifier):
+
+        running = True
+        print(self.bot_template.substitute(message="Hello There, how can i help you today?"))
+        while running:
+            self.delay = False
+            user_input = input("USER: ")
+            if user_input == "stop":
+                running = False
+                print("BOT: Good-bye, I hope I've been helpful")
+            elif user_input == "clear":
+                kb.clear_kb(kb)
+                print("BOT: Data Clear")
             else:
+                self.listen(classifier, user_input)
 
-                if self.FLAG == 1:
-                    print("Sup")
-                    if "yes" in userInput:
-                        self.findTrainTimes()
-                    else:
-                        self.clear()
-                        self.listen(userInput)
-                        self.respond(userInput)
-                else:
-                    self.listen(userInput)
-                    self.respond(userInput)
+    def listen(self, classifier, user_input):
+        intent = classifier.classify(self.meaning(user_input))
+        dates, times, sta, words = self.gatherData(user_input)
+        if dates:
+            self.analyseDates(words, dates)
+        if times:
+            self.analyseTimes(words, times)
+        if sta:
+            self.analyseStations(words, sta)
+        if dates or times or sta:
+            self.validData()
 
-    def listen(self, sentence):
-        words = sentence.split()
-        if "return" in sentence.lower():
-            self.RETURN = True
-        for counter, word in enumerate(words):
-
-            if word.lower() in self.TRAIN_STATIONS:
-                if words[counter - 1] is "to" or self.START_STATION is not "empty":
-                    self.DESTINATION_STATION = word.lower()
-                    print(self.DESTINATION_STATION)
-                else:
-                    self.START_STATION = word.lower()
-                    print(self.START_STATION)
-                    # date capture - only 1 method implemented with format "dd/mm/yy"
-            elif re.search(self.DATE_REGEX, word):
-                sday, smonth, syear = word.split("/")
-                self.DATE = self.DATE.replace(day=int(sday), month=int(smonth), year=int(syear))
-            elif re.search(self.TIME_REGEX, word):
-                hh, mm = word.split(":")
-                print(hh)
-                self.DATE = self.DATE.replace(hour=int(hh), minute=int(mm))
-                print(self.DATE)
-            elif self.RETURN is True:
-                if re.search(self.DATE_REGEX, word):
-                    sday, smonth, syear = word.split("/")
-                    self.DATE = self.RETURN_DATE = datetime.replace(day=int(sday), month=int(syear), year=int(syear))
-                elif re.search(self.TIME_REGEX, word):
-                    hh, mm = word.split(":")
-                    self.DATE = self.DATE.replace(hour=int(hh), minute=int(mm))
-
-    def respond(self, setence):
-        start = "BOT: "
-        answer = "You still need to enter your"
-        if self.START_STATION == "empty":
-            answer = answer + " starting station "
-        if self.DESTINATION_STATION == "empty":
-            if answer == "You still need to enter your":
-                answer = answer + " destination station "
-            else:
-                answer = answer + "and destination station"
-
-        # checks if they still need minimum information
-        if answer != "You still need to enter your":
-            print(start + answer)
+        elif intent == "ynQuestion":
+            self.ynQuestion(user_input)
+        elif intent == "whQuestion":
+            self.whQuestion(user_input)
+        elif intent == "Greet":
+            print((self.bot_template.substitute(message="Hiya!")))
+        elif intent == "Reject" or intent == "nAnswer":
+            print("BOT: Okay so we won't do that")
+        elif intent == "Agree" or intent == "yAnswer":
+            print("BOT: Glad we are both of the same page")
         else:
-            response = "You are traveling from " + self.START_STATION + " to " + self.DESTINATION_STATION + " on "
-            response = response + str(self.DATE.day) + "/" + str(self.DATE.month) + "/" + str(self.DATE.year) + " at "
-            response = response + str(self.DATE.hour) + ":" + str(self.DATE.minute)
-            if self.RETURN:
-                response = response + " and returning on the "
-                if self.RETURN_DATE.month == self.DATE.month and self.RETURN_DATE.day == self.DATE.day:
-                    response = response + "same day at"
+            print("BOT: Not sure if I understand you")
+
+    def ynQuestion(self, user_input):
+        print("no answer for the question sorry")
+
+    def whQuestion(self, user_input):
+        print("Whats up")
+
+    def gatherData(self, user_input):
+        user_input = user_input.replace(',', '')
+        words = user_input.split()
+        sta = []
+        dates = []
+        times = []
+        count = 0
+        times = re.findall(self.month, user_input)
+        for counter, word in enumerate(words):
+            # print(self.stemmer.stem(word))
+
+            if word.lower() in self.stations:
+                sta.append(word)
+            elif re.search(self.date_regex, word):
+                dates.append(word)
+                # print(word)
+            elif re.match(self.month, word):
+                print(word)
+                newDate = self.convertDate(user_input, word, words, count)
+                if newDate != "Not valid":
+                    count = count + 1
+                    dates.append(newDate)
+            elif re.search(self.time_regex, word):
+                times.append(word)
+            elif self.stemmer.stem(word) == "return" or self.stemmer.stem(word) == "back":
+                self.ret = True
+            elif self.stemmer.stem(word) in self.dayTerms:
+                dates.append(self.termToDate(self.stemmer.stem(word)))
+            elif self.stemmer.stem(word) in self.delayTerms:
+                self.delay = True
+
+        if dates:
+            self.analyseDates(words, dates)
+        if times:
+            self.analyseTimes(words, times)
+        if sta:
+            self.analyseStations(words, sta)
+
+        return dates, times, sta, words
+
+    def convertDate(self, user_input, word, words, count):
+
+        day = re.findall('\d+(?=st|nd|rd|th)', user_input)
+        if not day:
+            for word in words:
+                if word.lower() in self.dayTerms2:
+                    day.append(self.dayTerms2.index(word.lower()))
+        if not day:
+            return "Not valid"
+        month = str(self.monthToNumber(word))
+
+        if len(month) == 1:
+            month = "0" + month
+
+        newDate = day[count] + "/" + month + "/"
+
+        return (newDate + "19")
+
+        # analysing stations
+
+    def analyseStations(self, words, stations):
+        if len(stations) == 1:
+            if len(words) != 1:
+                x = words.index(stations[0])
+                if words[x - 1].lower() == "to":
+                    kb.set_to_station(kb, stations[0])
                 else:
-                    response = response + str(self.DATE.day) + "/" + str(self.DATE.month) + "/" + str(self.DATE.year)
-            print(response + ". Is that Correct?")
-            self.FLAG += 1
+                    kb.set_from_station(kb, stations[0])
 
-    def findTrainTimes(self):
-        class TrainTickets(KnowledgeEngine):
-            @DefFacts()
-            def _initial_action(self):
-                yield Fact(action="route")
+            else:
+                kb.set_from_station(kb, stations[0])
 
-            @Rule(Fact(action='route'),
-                  Fact(departing_station=MATCH.departing_station),
-                  Fact(arriving_station=MATCH.arriving_station),
-                  Fact(time=MATCH.time),
-                  Fact(date=MATCH.date))
-            def route(self, departing_station, arriving_station, time, date):
-                time = str(time)
-                url = "https://traintimes.org.uk/" + str(departing_station) + "/" + str(arriving_station) #+ "/" \
-                      #+ time + "/" + str(date)
-                print(url)
-                page = requests.get(url)
-                tree = html.fromstring(page.content)
-                if 'a' in time:
-                    time = time.replace('a', '')
-                    date = str(date)
-                    print(departing_station + ' to ' + arriving_station + ' arriving at ' + time + ' on ' + date)
+        else:
+            start = stations[1]
+            finish = stations[0]
+            temp = ""
+            x = words.index(start)
+            y = words.index(finish)
+            if len(words) > 1:
+                if words[x - 1].lower() == "to" or words[y - 1].lower() == "from":
+                    temp = start
+                    start = finish
+                    finish = temp
+            kb.set_from_station(kb, start.lower())
+            kb.set_to_station(kb, finish.lower())
+
+            # self.findTrainTimes()
+
+    # analysing dates
+    def analyseDates(self, words, dates):
+        date1 = datetime.strptime(dates[0], '%d/%m/%y')
+        # compare date needs to be made at begining of the run of the program
+        if self.compareDates(datetime.now(), date1):
+            self.date_error = True
+        elif len(dates) > 1:
+            date2 = datetime.strptime(dates[1], '%d/%m/%y')
+            if self.compareDates(date1, date2):
+                kb.set_date(kb, dates[1])
+                kb.set_return_date(kb, dates[0])
+            else:
+                kb.set_date(kb, dates[0])
+                kb.set_return_date(kb, dates[1])
+        else:
+            if kb.kb_date != "":
+                kb.set_return_date(kb, dates[0])
+            else:
+                kb.set_date(kb, dates[0])
+
+    def analyseTimes(self, words, times):
+        if len(times) == 1:
+            kb.set_time(kb, times[0])
+
+        else:
+            kb.set_time(kb, times[1])
+            kb.set_return_time(kb, times[0])
+
+    def compareDates(self, date1, date2):
+        return date1 > date2
+
+    def validData(self):
+        if self.delay == True:
+            print("Hes looking for a delay")
+        if kb.kb_to_station_name == "":
+            print("BOT: Okay, so what is your destination?")
+            flag = 0
+            while kb.kb_to_station_name == "" and flag != 1:
+                user_input = input("USER: ")
+                intent = self.listenForStation(user_input)
+                if intent == "Accept" or intent == "yAnswer":
+                    print("Okay, please can you type in your destination for this query")
+                elif intent == "Reject" or intent == "nAnswer":
+                    print("Ah okay, my mistake, how could I help you?")
+                    flag = 1
+                elif intent == "None":
+                    flag = 1
+
+        if kb.kb_from_station_name == "":
+            print("BOT: And where are you travelling from ?")
+            flag = 0
+            while kb.kb_from_station_name == "" and flag != 1:
+                user_input = input("USER: ")
+                intent = self.listenForStation(user_input)
+                if intent == "Accept" or intent == "yAnswer":
+                    print("Okay, please can you type in your destination")
+                elif intent == "Reject" or intent == "nAnswer":
+                    print("Ah okay, my mistake, how could I help you?")
+                    flag = 1
+
+        if self.delay == True:
+            print(self.delayReply())
+            x = self.confirm("chance of delay")
+            if x == "True":
+                pm.trainData(pm)
+            self.confirmed = False
+
+        else:
+            print(self.bookReply())
+            x = self.confirm("ticket information")
+            if x == "True":
+                train_times()
+            self.confirmed = False
+
+    def bookReply(self):
+        response = self.response_template.substitute(station1=kb.kb_from_station_name, station2=kb.kb_to_station_name)
+        if kb.kb_date == "":
+            response = response + " today"
+        else:
+            response = response + " on the " + kb.kb_date
+        if kb.kb_time != "":
+            response = response + " at " + kb.kb_time
+        if self.ret == True:
+            response = response + ". You will return "
+            if kb.kb_ret_date == "":
+                response = response + " later that day"
+            else:
+                response = response + "on " + kb.kb_ret_date
+            if kb.kb_ret_time != "":
+                response = response + " at " + kb.kb_ret_time
+
+        return response + ". Have I got that all right?"
+
+    def delayReply(self):
+
+        if kb.kb_date == "":
+            print("BOT: Which date do you want the prediction to be for?")
+            flag = 0
+            while kb.kb_date == "" and flag != 1:
+                user_input = input("USER: ")
+                intent = self.listenForDates(user_input)
+                if intent == "Accept" or intent == "yAnswer" or user_input.lower() == "yes":
+                    print("BOT: Alright, could you enter your date?")
+                elif intent == "Reject" or intent == "nAnswer":
+                    print("BOT: Ah okay, my mistake")
+                    flag = 1
+        if kb.kb_time == "":
+            flag = 0
+            print("BOT: What time is the prediciton for?")
+            while kb.kb_time == "" and flag != 1:
+                user_input = input("USER: ")
+                intent = self.listenForTimes(user_input)
+                if intent == "Accept" or intent == "yAnswer" or user_input.lower() == "yes":
+                    print("BOT: Okay so you to contiue, please enter your time for the prediciton model")
+                elif intent == "Reject" or intent == "nAnswer" or user_input.lower() == "no":
+                    print("BOT: Ah okay, my mistake lets go back to the beginning ")
+                    flag = 1
+        response = "BOT: Okay, so you want to know the chance of a delay between " + kb.kb_from_station_name + " to " + kb.kb_to_station_name + " on the " + kb.kb_date + " at " + kb.kb_time
+        return response + ". Is that correct?"
+
+
+
+    def confirm(self, query):
+        while self.confirmed == False:
+            user_input = input("USER: ")
+            dates, times, sta, words = self.gatherData(user_input)
+            intent = self.determineIntent(user_input)
+            if intent == "yAnswer" or intent == "Agree" or user_input.lower() == "yes":
+                print("BOT: Alrighty, I shall retrieve the " + query)
+                self.confirmed = True
+                return "True"
+            elif intent == "nAnswer" or intent == "Reject" or user_input.lower() == "no":
+                print("BOT: Okay what did i get wrong?")
+                self.checkMistakes(user_input, dates, times, sta, query)
+            else:
+                if dates or times or sta:
+                    self.checkMistakes(user_input, dates, times, sta, query)
                 else:
-                    print(departing_station + ' to ' + arriving_station + ' departing at ' + time + ' on ' + date)
-                for x in range(5):
-                    printout = ''
-                    times = tree.xpath('//li[@id="result' + str(x) + '"]/strong[1]/text()')
-                    printout = printout + re.sub('[\[\'\]' ']', '', str(times))
-                    platform_temp = tree.xpath('//li[@id="result' + str(x) + '"]/small/em/text()')
-                    platform_temp = str(platform_temp).replace('\\n', '').replace('\\t', '').replace('Platform',
-                                                                                                     'Platform ') \
-                        .replace(';', ' ')
-                    platform = re.sub('[^a-zA-Z\d\s:]', '', str(platform_temp))
-                    if platform_temp:
-                        printout = printout + ' ' + platform + ' '
-                    else:
-                        printout = printout + '             '
-                    price = tree.xpath('//li[@id="result' + str(x) + '"]/small[2]/span[@class="tooltip" and 1]/text()')
-                    printout = printout + re.sub('[\[\'\]' ']', '', str(price))
-                    print(printout)
+                    print("BOT: I'm not sure what you want me to do")
 
-        engine = TrainTickets()
-        engine.reset()  # Prepare the engine for the execution.
-        engine.declare(Fact(departing_station=self.START_STATION))
-        engine.declare(Fact(arriving_station=self.DESTINATION_STATION))
-        engine.declare(Fact(time=time))
-        engine.declare(Fact(date=self.DATE))
-        engine.run()  # Run it!
+    def checkMistakes(self, user_input, dates, times, sta, query):
+        words = user_input.split()
+        if dates:
+            if len(dates) > 1:
+                self.analyseDates(words, dates)
+            elif self.ret == True:
+                    kb.set_return_date(kb, dates[0])
+            else:
+                kb.set_date(kb, dates[0])
+        if times:
+            if len(times) > 1:
+                self.analyseTimes(words, times)
 
-    def clear(self):
-        self.START_STATION = "empty"
-        self.DESTINATION_STATION = "empty"
-        self.DATE = datetime.today()
-        self.RETURN = False
-        self.RETURN_DATE = datetime.today()
-        self.FLAG = 0
+            elif self.ret:
+                    kb.set_time(kb, times[0])
+            else:
+                kb.set_time(kb, times[0])
+
+        if sta:
+            if len(sta) > 1:
+                self.analyseStations(words, sta)
+            elif self.ret == True:
+                if "return" in user_input:
+                    kb.set_to_station(sta[0])
+                else:
+                    print("BOT: Is that the depature or return station?")
+                    user_input = input("USER: ")
+                    intent = self.determineIntent(user_input)
+                    if intent == "yAnswer" or intent == "Agree" or user_input.lower() == "yes" or user_input.lower() == "departure":
+                        kb.set_time = sta[0]
+                    elif intent == "nAnswer" or intent == "Reject" or user_input.lower() == "no" or user_input.lower() == "return":
+                        kb.set_ret_date = sta[0]
+            else:
+                kb.set_from_station_name(kb, sta[0])
+        print(self.bookReply())
+        self.confirm(query)
+
+    def listenForStation(self, user_input):
+        words = user_input.split()
+        stations = []
+        for word in words:
+            if word.lower() in self.stations:
+                stations.append(word)
+
+        if stations:
+            station = stations[0]
+            if len(stations) == 2:
+                self.analyseStations(words, stations)
+
+            elif kb.kb_to_station_name == "":
+                # print("to station")
+                kb.set_to_station(kb, station)
+
+            else:
+                # print("fROM STATION")
+                kb.set_from_station(kb, station)
+
+            return
+        else:
+            print("BOT: Do you not wish to book a train?")
+            user_input = input("USER: ")
+            return self.determineIntent(user_input)
+
+    def listenForDates(self, user_input):
+        words = user_input.split()
+        dates = []
+        for word in words:
+            if self.stemmer.stem(word) in self.dayTerms:
+                dates.append(self.termToDate(self.stemmer.stem(word)))
+            elif re.search(self.date_regex, word):
+                dates.append(word)
+            elif re.search(self.dayTerms, word):
+                dates.append(word)
+        if dates:
+            kb.set_date(kb, dates[0])
+            return ("True")
+        else:
+            print("BOT: I did not understand you there, do you wish to continue finding a delay prediction?")
+            user_input = input("USER: ")
+            return self.determineIntent(user_input)
+
+    def listenForTimes(self, user_input):
+        words = user_input.split()
+        times = []
+        for word in words:
+            if re.search(self.time_regex, word):
+                times.append(word)
+        if times:
+            kb.set_time(kb, times[0])
+            return ("True")
+        else:
+            print("BOT: I did not understand you there, do you not wish to continue finding a delay prediction?")
+            user_input = input("USER: ")
+            return self.determineIntent(user_input)
+
+    def determineIntent(self, user_input):
+        intent = classifier.classify(self.meaning(user_input))
+        return intent
+
+    def monthToNumber(self, string):
+        m = {
+            'jan': 1,
+            'feb': 2,
+            'mar': 3,
+            'apr': 4,
+            'may': 5,
+            'jun': 6,
+            'jul': 7,
+            'aug': 8,
+            'sep': 9,
+            'oct': 10,
+            'nov': 11,
+            'dec': 12
+        }
+
+        s = string.strip()[:3].lower()
+
+        try:
+            out = m[s]
+            return out
+        except:
+            raise ValueError('Not a month')
+
+    def termToDate(self, string):
+        daysLater = self.termToNumber(string.lower())
+        d = datetime.today()
+        d = d + timedelta(days=daysLater)
+        return str(d.strftime('%d/%m/%y'))
+
+    def termToNumber(self, string):
+        n = {
+            'today': 0,
+            'tomorrow': 1,
+            'week': 7,
+            'fortnight': 14,
+            'fort night': 14,
+        }
+        try:
+            out = n[string]
+            return out
+        except:
+            raise ValueError("Not a term")
+
+    def compareTime(self, time1, time2):
+        return time1 > time2
 
 
-TestChatBot = GACHATBOT()
-TestChatBot.runBot()
+import numpy as np
 
 
+class PredictionModel:
+
+    def __init__(self):
+
+        # generating the seed for the random number
+        np.random.seed(1)
+
+        # converting the weights, based on a 3 integer array representing information
+        # about the train route, and a 1 integer array based on whether the train is
+        # late or not
+        self.weights = 2 * np.random.random((3, 1)) - 1
+
+        # applies the sigmoid function to normalise sum of the inputs
+
+    def sigmoid(self, x):
+
+        return 1 / (1 + np.exp(-x))
+
+    # calculates the derivative to the sigmoid function above for weight adjustments
+    def sigmoidDerivative(self, x):
+
+        return x * (1 - x)
+
+    # trains the prediction model to understand and learn the outcomes of the train
+    # routes based on the information given by the 2 arrays mentioned above
+    def weightAdjustment(self, routeInformation, routeLate, trainingIterations):
+
+        for iteration in range(trainingIterations):
+            # iterates through each instance of a train route information
+            output = self.prediction(routeInformation)
+
+            # computes the back propogation outcome
+            error = routeLate - output
+
+            # adjusts weights using sigmoid derivative to enhance accuracy
+            adjustments = np.dot(routeInformation.T, error * self.sigmoidDerivative(output))
+
+            self.weights += adjustments
+
+    # passes new data through the instances in the model to receive accurate
+    # prediction based on the weights calculated earlier
+    def prediction(self, inputs):
+
+        inputs = inputs.astype(float)
+        output = self.sigmoid(np.dot(inputs, self.weights))
+        return output
+
+    def timeMean(self, times):
+
+        mean = 0
+        count = 0
+
+        for number in times:
+            mean = (mean + number)
+            count += 1
+
+        mean = mean / count
+
+        mean = int(round(mean))
+
+        return mean
+
+    def trainData(self):
+
+        trainPredictions = PredictionModel()
+        departing_station = kb.get_from_station(kb).lower()
+        arrival_station = kb.get_to_station(kb).lower()
+        temp_date = kb.get_date(kb)
+        if temp_date != 'today':
+            temp_date = re.sub('[^\d]', '', temp_date)
+        # print(temp_date)
+        day = date(int(str('20' + temp_date[4:6])), int(temp_date[2:4]), int(temp_date[:2]))
+        # print(day)
+        time = kb.get_time(kb)
+        time = re.sub('[^\d]', '', time)
+        dayOfTravel = day.weekday()
+        if dayOfTravel >= 6:
+            day = 1
+        else:
+            day = 0
+        url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + departing_station + "/" + arrival_station \
+              + "/"  + temp_date + "/"+ time + "/dep"
+        page = requests.get(url)
+        # print(url)
+        tree = html.fromstring(page.content)
+        # print(str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[6]/text()')))
+        number_of_changeovers = re.sub('[^\d]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[6]/text()')))
+
+        if int(number_of_changeovers) > 1:
+
+            stops = 1
+
+        else:
+
+            stops = 0
+        # 6am - 9am | 4pm-7pm
+        time = int(time)
+        if ((time >= 600) & (time <= 900) or ((time >= 1600) & (time <= 1900))):
+
+            time = 1
+
+        else:
+
+            time = 0
+
+        if departing_station == 'acle':
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 0, 0, 1, 0,
+                                   0, 1, 0, 1, 1,
+                                   1, 1, 1, 0, 0,
+                                   1, 0, 0, 1, 0,
+                                   0, 0, 0, 0, 0,
+                                   0, 0, 1, 1, 0,
+                                   0, 1, 0, 0, 1,
+                                   1, 0, 1, 0, 0]]).T
+
+            delayTimes = {5, 2, 7, 1, 7, 11, 2, 3, 1, 10, 8, 4, 6, 3, 2,
+                          6, 3, 9, 6, 1, 2, 8, 17, 5, 2, 4, 1, 7, 3, 6, 4,
+                          8, 12, 6, 7, 2, 12, 3, 6, 1, 5, 8, 6, 14, 5, 6, 2}
+
+        elif departing_station == 'attleborough':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 0, 0, 0, 0,
+                                   0, 1, 0, 0, 1,
+                                   0, 1, 0, 0, 0,
+                                   1, 0, 0, 1, 0,
+                                   0, 0, 0, 0, 0,
+                                   0, 0, 0, 1, 0,
+                                   0, 1, 0, 0, 0,
+                                   1, 0, 1, 0, 0]]).T
+
+            delayTimes = {10, 2, 5, 8, 3, 12, 4, 5, 2, 2, 15, 35, 15, 3, 17, 31, 26,
+                          4, 16, 4, 21, 4, 1, 4, 4, 6, 3, 7, 6, 4, 4, 7, 11, 5,
+                          7, 2, 9, 4, 1, 1, 2, 1, 4, 2, 5}
+
+        elif departing_station == 'beccles':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 0, 0, 0, 0,
+                                   0, 0, 0, 0, 0,
+                                   0, 1, 0, 0, 0,
+                                   1, 0, 0, 0, 0,
+                                   0, 0, 0, 0, 0,
+                                   0, 0, 0, 0, 0,
+                                   0, 0, 0, 1, 0,
+                                   1, 0, 0, 0, 0]]).T
+
+            delayTimes = {1, 3, 3, 6, 2, 3, 4, 8, 1, 3, 6, 3, 9, 12, 3, 8, 10, 3, 1,
+                          6, 8, 4, 8, 2, 6, 4, 7, 4, 2, 7, 5, 3, 9, 10, 3, 9,
+                          4, 6, 13, 6, 5, 4, 8, 8, 5, 7, 4, 4, 2, 5, 6, 6, 2}
+
+        elif departing_station == 'cambridge':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 1, 1, 0, 0,
+                                   1, 1, 1, 0, 0,
+                                   0, 1, 1, 1, 0,
+                                   1, 1, 1, 0, 1,
+                                   0, 1, 0, 0, 1,
+                                   1, 0, 0, 1, 0,
+                                   0, 1, 0, 0, 0,
+                                   0, 0, 0, 1, 1]]).T
+
+            delayTimes = {12, 4, 6, 2, 5, 8, 7, 4, 6, 5, 3, 4, 4, 10, 5, 9,
+                          2, 20, 8, 14, 6, 12, 10, 8, 5, 3, 6, 13, 8, 16, 5,
+                          8, 4, 2, 10, 4, 16, 5, 8, 9, 6, 2, 6, 3, 6, 3, 8, 10}
+
+        elif departing_station == 'diss':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[1, 1, 0, 0, 0,
+                                   0, 1, 1, 1, 0,
+                                   0, 1, 0, 1, 1,
+                                   1, 0, 0, 0, 1,
+                                   0, 0, 0, 0, 1,
+                                   1, 1, 0, 0, 0,
+                                   0, 0, 0, 1, 1,
+                                   0, 1, 0, 0, 0]]).T
+
+            delayTimes = {9, 4, 8, 7, 9, 1, 7, 8, 5, 9, 3, 2, 10, 4, 6, 4,
+                          18, 22, 2, 13, 4, 8, 2, 9, 6, 7, 3, 5, 12, 6, 5, 4, 9,
+                          4, 9, 9, 4, 4, 1, 4, 5, 7, 8, 4, 2, 3, 3, 6, 1, 3}
+
+        elif departing_station == 'ipswich':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 1, 0, 0, 0,
+                                   0, 1, 1, 0, 0,
+                                   0, 1, 0, 1, 0,
+                                   0, 0, 1, 0, 1,
+                                   0, 0, 0, 0, 0,
+                                   0, 1, 0, 0, 0,
+                                   0, 0, 0, 1, 0,
+                                   0, 1, 0, 1, 0]]).T
+
+            delayTimes = {4, 6, 2, 8, 5, 12, 8, 4, 6, 3, 10, 5, 5, 4, 8, 2, 7,
+                          4, 8, 1, 21, 8, 10, 4, 6, 9, 3, 10, 4, 8, 22, 13, 10,
+                          4, 9, 10, 6, 2, 7, 4, 9, 5, 5}
+
+        elif departing_station == 'norwich':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 1, 1, 1, 0,
+                                   0, 0, 1, 1, 0,
+                                   0, 1, 0, 1, 0,
+                                   1, 0, 1, 0, 1,
+                                   0, 1, 0, 0, 0,
+                                   0, 0, 1, 1, 0,
+                                   1, 1, 0, 0, 1,
+                                   1, 1, 0, 1, 0]]).T
+
+            delayTimes = {3, 8, 5, 17, 13, 5, 9, 5, 8, 10, 5, 2, 2, 3, 2, 6,
+                          4, 9, 10, 3, 2, 3, 8, 10, 3, 6, 8, 8, 6, 5, 7, 3, 12,
+                          10, 5, 3, 2, 2, 8, 4, 7, 2, 9, 5, 14, 9, 3, 12, 10}
+
+        elif departing_station == 'peterborough':
+
+            routeInformation = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0],
+                                         [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1],
+                                         [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0],
+                                         [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1], [0, 1, 1],
+                                         [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0],
+                                         [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1], [1, 0, 1],
+                                         [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0], [1, 1, 0],
+                                         [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]])
+            routeLate = np.array([[0, 1, 1, 1, 0,
+                                   0, 0, 1, 1, 0,
+                                   1, 1, 0, 1, 0,
+                                   1, 1, 1, 0, 1,
+                                   0, 1, 0, 0, 1,
+                                   0, 0, 0, 1, 0,
+                                   0, 1, 0, 0, 1,
+                                   1, 0, 1, 1, 0]]).T
+
+            delayTimes = {6, 2, 9, 14, 10, 4, 8, 9, 4, 6, 1, 1, 7, 3, 2, 9, 5,
+                          8, 14, 9, 10, 4, 6, 8, 3, 2, 6, 9, 13, 5, 2, 6, 4,
+                          9, 5, 6, 4, 9, 2, 3, 9, 6, 4, 5, 1, 7, 4, 12, 6}
+
+        trainPredictions.weightAdjustment(routeInformation, routeLate, 15000)
+
+        prediction = trainPredictions.prediction(np.array([day, stops, time]))
+        percentage = prediction * 100
+        print("There is up to a ", percentage, "% chance that your train will be delayed")
+
+        predictedDelay = trainPredictions.timeMean(delayTimes)
+        print("Your predicted train delay is ", predictedDelay, " minutes, should one occur.")
 
 
+if __name__ == "__main__":
+    kb = KnowledgeBase
+    pm = PredictionModel
+    ps = PorterStemmer()
+    example_words = ["Interuptions", "delays", "late", "back", "delay"]
+    #for w in example_words:
+        # print(ps.stem(w))
+    test_bot = GAChatBot()
+    classifier = test_bot.setup()
+    test_bot.run(classifier)
