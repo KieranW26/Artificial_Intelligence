@@ -176,93 +176,92 @@ def train_times():
             to_station = row[1]
 
     # Starts builds URL for data scraping
-    if (from_station != "") & (to_station != ""):
-        url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + from_station + "/" + to_station
-        if date == "":
-            date = "today"
+    url = "http://ojp.nationalrail.co.uk/service/timesandfares/" + from_station + "/" + to_station
+    if date == "":
+        date = "today"
+    else:
+        date = re.sub('[^\d]', '', date)
+    url = url + "/" + date
+    if time == "":
+        time = str(datetime.now().time())
+        time = time[0:2] + time[3:5]
+    url = url + "/" + time
+    if depart_or_arrive == "":
+        depart_or_arrive = "dep"
+    url = url + "/" + depart_or_arrive
+    if ret_date != "":
+        url = url + "/" + ret_date
+        if ret_time == "":
+            url = url + "/" + "2200"
         else:
-            date = re.sub('[^\d]', '', date)
-        url = url + "/" + date
-        if time == "":
-            time = str(datetime.now().time())
-            time = time[0:2] + time[3:5]
-        url = url + "/" + time
-        if depart_or_arrive == "":
-            depart_or_arrive = "dep"
-        url = url + "/" + depart_or_arrive
-        if ret_date != "":
-            url = url + "/" + ret_date
-            if ret_time == "":
-                url = url + "/" + "2200"
-            else:
-                url = url + "/" + ret_time
-            if ret_depart_or_arrive == "":
-                url = url + "/dep"
-            else:
-                url = url + "/" + ret_depart_or_arrive
-            page = requests.get(url)
-            tree = html.fromstring(page.content)
-            price = tree.xpath('//*[@id="singleFaresPane"]/strong/text()')
+            url = url + "/" + ret_time
+        if ret_depart_or_arrive == "":
+            url = url + "/dep"
         else:
-            page = requests.get(url)
-            tree = html.fromstring(page.content)
-            price = tree.xpath('//*[@id="fare-switcher"]/div/a/strong/text()')
-        #After string is full formed, goes to url and scraping is below.
-        price = re.sub(',.*$|[^£\d\.]', '', str(price))
+            url = url + "/" + ret_depart_or_arrive
+        page = requests.get(url)
+        tree = html.fromstring(page.content)
+        price = tree.xpath('//*[@id="singleFaresPane"]/strong/text()')
+    else:
+        page = requests.get(url)
+        tree = html.fromstring(page.content)
+        price = tree.xpath('//*[@id="fare-switcher"]/div/a/strong/text()')
+    #After string is full formed, goes to url and scraping is below.
+    price = re.sub(',.*$|[^£\d\.]', '', str(price))
 
-        f_time_dep = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[1]/text()')))
-        f_time_arr = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[4]/text()')))
-        f_price = re.sub('[^£\d\.]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[9]/div/label/text()')))
-        ret_dep_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[1]/text()')))
-        ret_arr_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[4]/text()')))
-        ret_f_price = re.sub('[^£\d\.:]', '',
-                             str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[9]/div[2]/label/text()')))
+    f_time_dep = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[1]/text()')))
+    f_time_arr = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[4]/text()')))
+    f_price = re.sub('[^£\d\.]', '', str(tree.xpath('//*[@id="oft"]/tbody/tr[1]/td[9]/div/label/text()')))
+    ret_dep_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[1]/text()')))
+    ret_arr_time = re.sub('[^£\d\.:]', '', str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[4]/text()')))
+    ret_f_price = re.sub('[^£\d\.:]', '',
+                         str(tree.xpath('//*[@id="ift"]/tbody/tr[1]/td[9]/div[2]/label/text()')))
 
-        # Collates and returns the information retrieved based upon the information required
-        if ret_date == "":
-            output = "The train closest to your chosen time leaves " + from_station_name + " at " \
-                     + f_time_dep + " "
-            if date != 'today':
-                output = output + " on " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
-            else:
-                output = output + date
-            output = output + ". Arriving in " + to_station_name + " at " + f_time_arr
-            output = output + " costing " + f_price
+    # Collates and returns the information retrieved based upon the information required
+    if ret_date == "":
+        output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                 + f_time_dep + " "
+        if date != 'today':
+            output = output + " on " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+        else:
+            output = output + date
+        output = output + ". Arriving in " + to_station_name + " at " + f_time_arr
+        output = output + " costing " + f_price
 
-            if price == f_price:
-                output = output + ". This is the cheapest fare around those times." \
-
-            else:
-                output = output + "\n" + "Cheapest price found from " + from_station_name + " to " + to_station_name \
-                         + " for " + price
+        if price == f_price:
+            output = output + ". This is the cheapest fare around those times." \
 
         else:
-            ret_f_price = re.sub('[^\d]', '', ret_f_price)
-            f_price = re.sub('[^\d]', '', f_price)
-            print(url)
-            total_price = float(f_price) + float(ret_f_price)
-            total_price = total_price / 100
-            total_price = str("£" + "%.2f" % total_price)
-            output = "The train closest to your chosen time leaves " + from_station_name + " at " \
-                     + f_time_dep + " and arrives at " + to_station_name + " at " + f_time_arr
-            if date != 'today':
-                output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
-            else:
-                output = output + " on " + date
-            output = output + ".\nYour return journey will leave " + to_station_name + " at " + ret_dep_time \
-                     + " and arrives at " + from_station_name + " at " + ret_arr_time
-            if ret_date != 'today':
-                output = output + " on " + ret_date[:2] + "/" + ret_date[2:4] + "/" + ret_date[4:8]
-            else:
-                output = output + ret_date
-            output = output + ".\nThis journey will cost " + total_price
-            if total_price != price:
-                output = output + "\nCheaper return journey from " + from_station_name + " to " + to_station_name \
-                         + " for " + price + " is available."
+            output = output + "\n" + "Cheapest price found from " + from_station_name + " to " + to_station_name \
+                     + " for " + price
 
-        #Prints prices found and a link to them.
-        print(output)
+    else:
+        ret_f_price = re.sub('[^\d]', '', ret_f_price)
+        f_price = re.sub('[^\d]', '', f_price)
         print(url)
+        total_price = float(f_price) + float(ret_f_price)
+        total_price = total_price / 100
+        total_price = str("£" + "%.2f" % total_price)
+        output = "The train closest to your chosen time leaves " + from_station_name + " at " \
+                 + f_time_dep + " and arrives at " + to_station_name + " at " + f_time_arr
+        if date != 'today':
+            output = output + " " + date[:2] + "/" + date[2:4] + "/" + date[4:8]
+        else:
+            output = output + " on " + date
+        output = output + ".\nYour return journey will leave " + to_station_name + " at " + ret_dep_time \
+                 + " and arrives at " + from_station_name + " at " + ret_arr_time
+        if ret_date != 'today':
+            output = output + " on " + ret_date[:2] + "/" + ret_date[2:4] + "/" + ret_date[4:8]
+        else:
+            output = output + ret_date
+        output = output + ".\nThis journey will cost " + total_price
+        if total_price != price:
+            output = output + "\nCheaper return journey from " + from_station_name + " to " + to_station_name \
+                     + " for " + price + " is available."
+
+    #Prints prices found and a link to them.
+    print(output)
+    print(url)
 
 
 class GAChatBot:
@@ -300,7 +299,7 @@ class GAChatBot:
 
     delayTerms = ["delay", "late", "interupt"]
     everything = ["everything", "all", "none"]
-
+    book = False
     ret = False
     confirmed = False
     delay = False
@@ -327,6 +326,7 @@ class GAChatBot:
         running = True
         print(self.bot_template.substitute(message="Hello There, how can i help you today?"))
         while running:
+            self.book = False
             self.delay = False
             user_input = input("USER: ")
             if user_input == "stop":
@@ -347,7 +347,7 @@ class GAChatBot:
             self.analyseTimes(words, times)
         if sta:
             self.analyseStations(words, sta)
-        if dates or times or sta:
+        if dates or times or sta or self.delay or self.book:
             self.validData()
 
         elif intent == "ynQuestion":
@@ -364,10 +364,10 @@ class GAChatBot:
             print("BOT: Not sure if I understand you")
 
     def ynQuestion(self, user_input):
-        print("no answer for the question sorry")
+        print("BOT: no answer for the question sorry")
 
     def whQuestion(self, user_input):
-        print("Whats up")
+        print("BOT: no answer for the question")
 
     def gatherData(self, user_input):
         user_input = user_input.replace(',', '')
@@ -399,7 +399,8 @@ class GAChatBot:
                 dates.append(self.termToDate(self.stemmer.stem(word)))
             elif self.stemmer.stem(word) in self.delayTerms:
                 self.delay = True
-
+            elif word.lower() == "book":
+                self.book = True
         if dates:
             self.analyseDates(words, dates)
         if times:
@@ -489,8 +490,6 @@ class GAChatBot:
         return date1 > date2
 
     def validData(self):
-        if self.delay == True:
-            print("Hes looking for a delay")
         if kb.kb_to_station_name == "":
             print("BOT: Okay, so what is your destination?")
             flag = 0
@@ -630,9 +629,12 @@ class GAChatBot:
                     elif intent == "nAnswer" or intent == "Reject" or user_input.lower() == "no" or user_input.lower() == "return":
                         kb.set_ret_date = sta[0]
             else:
-                kb.set_from_station_name(kb, sta[0])
+                kb.set_from_station(kb, sta[0])
         print(self.bookReply())
-        self.confirm(query)
+        x = self.confirm(query)
+        if x == "True":
+            train_times()
+        self.confirmed = False
 
     def listenForStation(self, user_input):
         words = user_input.split()
